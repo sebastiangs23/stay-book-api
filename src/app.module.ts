@@ -11,6 +11,7 @@ import { Reservation } from './models/reservations/reservation.model';
 import { ReservationsModule } from './modules/reservations/reservation.module';
 import { UsersModule } from './modules/users/users.module';
 import { RoomsModule } from './modules/rooms/rooms.module';
+import { SubmoduleModule } from './modules/submodule/submodule.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -38,6 +39,7 @@ import { RoomsModule } from './modules/rooms/rooms.module';
     ReservationsModule,
     UsersModule,
     RoomsModule,
+    SubmoduleModule,
   ],
 })
 export class AppModule {}
