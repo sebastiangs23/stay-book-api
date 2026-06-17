@@ -21,7 +21,7 @@ export class ListReservationsQueryDto {
   @IsOptional()
   @IsDateString()
   from?: string;
-
+    
   @IsOptional()
   @IsDateString()
   to?: string;

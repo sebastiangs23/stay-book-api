@@ -9,6 +9,8 @@ import { User } from './models/users/users.model';
 import { Room } from './models/rooms/room.model';
 import { Reservation } from './models/reservations/reservation.model';
 import { ReservationsModule } from './modules/reservations/reservation.module';
+import { UsersModule } from './modules/users/users.module';
+import { RoomsModule } from './modules/rooms/rooms.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -34,6 +36,8 @@ import { ReservationsModule } from './modules/reservations/reservation.module';
     }),
 
     ReservationsModule,
+    UsersModule,
+    RoomsModule,
   ],
 })
 export class AppModule {}
