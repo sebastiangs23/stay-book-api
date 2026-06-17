@@ -1,19 +1,21 @@
-import { IsDateString, IsInt, Min } from 'class-validator';
+import { IsDateString, IsInt, IsNotEmpty, Min } from 'class-validator';
 
 export class CreateReservationDto {
+  @IsNotEmpty()
   @IsInt()
   @Min(1)
   roomId!: number;
 
-  // Temporary until auth is implemented.
-  // Later this will come from the JWT user.
+  @IsNotEmpty()
   @IsInt()
   @Min(1)
   userId!: number;
 
+  @IsNotEmpty()
   @IsDateString()
   checkIn!: string;
 
+  @IsNotEmpty()
   @IsDateString()
   checkOut!: string;
 }

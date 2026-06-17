@@ -25,7 +25,7 @@ export class Room extends Model {
     type: DataType.BOOLEAN,
     defaultValue: true,
   })
-  isActive!: boolean;
+  declare isActive: boolean;
 
   @Column({
     type: DataType.INTEGER,
