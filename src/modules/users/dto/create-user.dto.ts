@@ -4,6 +4,7 @@ import {
   IsNotEmpty,
   IsString,
   MinLength,
+  IsBoolean,
 } from 'class-validator';
 
 export class CreateUserDto {
@@ -19,6 +20,10 @@ export class CreateUserDto {
   @IsNotEmpty()
   @MinLength(6)
   password!: string;
+
+  @IsBoolean()
+  @IsNotEmpty()
+  isActive!: string;
 
   @IsIn(['GUEST', 'STAFF'])
   role!: 'GUEST' | 'STAFF';

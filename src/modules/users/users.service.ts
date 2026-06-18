@@ -47,6 +47,7 @@ export class UsersService {
       email: dto.email,
       passwordHash,
       role: dto.role,
+      isActive: dto.isActive,
     });
 
     return this.sanitizeUser(user);
@@ -122,7 +123,6 @@ export class UsersService {
   }
 
   async findByEmailWithPassword(email: string) {
-    console.log('email', email)
     return this.userModel.findOne({
       where: { email },
     });
@@ -134,7 +134,7 @@ export class UsersService {
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
-    // console.log()
+
     const isPasswordValid = await bcrypt.compare(
       dto.password,
       user.passwordHash,
