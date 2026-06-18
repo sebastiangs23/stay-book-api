@@ -14,7 +14,7 @@ import { User } from '../../models/users/users.model';
 
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { ListReservationsQueryDto } from './dto/list-reservations-query.dto';
-
+import { UpdateReservationDto } from './dto/update-reservation.dto';
 @Injectable()
 export class ReservationsService {
   constructor(
@@ -72,7 +72,6 @@ export class ReservationsService {
           checkOut: {
             [Op.gt]: checkIn,
           },
-          numberOfGuest: dto.numberOfGuest,
         },
         transaction,
       });
@@ -171,7 +170,7 @@ export class ReservationsService {
         },
         {
           model: User,
-          attributes: ['id', 'name', 'email', 'role', 'numberOfGuest'],
+          attributes: ['id', 'name', 'email', 'role'],
         },
       ],
       order: [['checkIn', 'ASC']],
@@ -198,7 +197,7 @@ export class ReservationsService {
         },
         {
           model: User,
-          attributes: ['id', 'name', 'email', 'role', 'numberOfGuest'],
+          attributes: ['id', 'name', 'email', 'role'],
         },
       ],
     });
@@ -221,6 +220,18 @@ export class ReservationsService {
       throw new BadRequestException('Reservation is already cancelled');
     }
 
+    const now = new Date();
+    const checkIn = new Date(reservation.checkIn);
+
+    const diffMs = checkIn.getTime() - now.getTime();
+    const diffHours = diffMs / (1000 * 60 * 60);
+
+    if (diffHours <= 24) {
+      throw new BadRequestException(
+        'You can only cancel a reservation more than 24 hours before check-in',
+      );
+    }
+
     reservation.status = 'CANCELLED';
 
     await reservation.save();
@@ -229,5 +240,93 @@ export class ReservationsService {
       message: 'Reservation cancelled successfully',
       reservation,
     };
+  }
+
+  async updateReservation(id: number, dto: UpdateReservationDto) {
+    const reservation = await this.reservationModel.findByPk(id);
+
+    if (!reservation) {
+      throw new NotFoundException('Reservation not found');
+    }
+
+    if (reservation.status === 'CANCELLED') {
+      throw new BadRequestException('Cannot edit a cancelled reservation');
+    }
+
+    const checkIn = dto.checkIn
+      ? new Date(dto.checkIn)
+      : new Date(reservation.checkIn);
+    const checkOut = dto.checkOut
+      ? new Date(dto.checkOut)
+      : new Date(reservation.checkOut);
+    const numberOfGuest = dto.numberOfGuest ?? reservation.numberOfGuest;
+
+    if (checkIn >= checkOut) {
+      throw new BadRequestException('checkOut must be after checkIn');
+    }
+
+    if (numberOfGuest < 1 || numberOfGuest > 15) {
+      throw new BadRequestException(
+        'Number of guests must be between 1 and 15',
+      );
+    }
+
+    const nights = differenceInCalendarDays(checkOut, checkIn);
+
+    if (nights <= 0) {
+      throw new BadRequestException('Reservation must be at least 1 night');
+    }
+
+    return this.sequelize.transaction(async (transaction) => {
+      await this.sequelize.query('SELECT pg_advisory_xact_lock(:roomId)', {
+        replacements: { roomId: reservation?.dataValues?.roomId },
+        transaction,
+      });
+
+      const room = await this.roomModel.findByPk(reservation?.dataValues?.roomId, {
+        transaction,
+      });
+
+      if (!room || !room.isActive) {
+        throw new NotFoundException('Room not found or inactive');
+      }
+
+      const overlappingReservation = await this.reservationModel.findOne({
+        where: {
+          id: {
+            [Op.ne]: id,
+          },
+          roomId: reservation?.dataValues.roomId,
+          status: 'CONFIRMED',
+          checkIn: {
+            [Op.lt]: checkOut,
+          },
+          checkOut: {
+            [Op.gt]: checkIn,
+          },
+        },
+        transaction,
+      });
+
+      if (overlappingReservation) {
+        throw new BadRequestException(
+          'This room is already reserved for the selected dates',
+        );
+      }
+
+      const totalPrice = Number(room.price) * nights;
+
+      await reservation.update(
+        {
+          checkIn,
+          checkOut,
+          numberOfGuest,
+          totalPrice,
+        },
+        { transaction },
+      );
+
+      return this.findOne(id);
+    });
   }
 }
