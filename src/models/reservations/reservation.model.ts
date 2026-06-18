@@ -65,13 +65,13 @@ export class Reservation extends Model {
     allowNull: false,
   })
   totalPrice!: number;
-
+  //TODO
   @Column({
-    type: DataType.ENUM('CONFIRMED', 'CANCELLED'),
+    type: DataType.ENUM('ACTIVE', 'CANCELLED', 'UPCOMING'),
     allowNull: false,
     defaultValue: 'CONFIRMED',
   })
-  status!: 'CONFIRMED' | 'CANCELLED';
+  status!: 'ACTIVE' | 'CANCELLED' | 'UPCOMING';
 
   @Column({
     type: DataType.INTEGER,

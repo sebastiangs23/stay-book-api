@@ -15,6 +15,9 @@ import { User } from '../../models/users/users.model';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { ListReservationsQueryDto } from './dto/list-reservations-query.dto';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
+
+type PublicReservationStatus = 'UPCOMING' | 'ACTIVE' | 'CANCELLED' | 'PAST';
+
 @Injectable()
 export class ReservationsService {
   constructor(
@@ -30,9 +33,57 @@ export class ReservationsService {
     private readonly userModel: typeof User,
   ) {}
 
+  private getPublicStatus(reservation: any): PublicReservationStatus {
+    if (reservation.status === 'CANCELLED') {
+      return 'CANCELLED';
+    }
+
+    const now = new Date();
+    const checkIn = new Date(reservation.checkIn);
+    const checkOut = new Date(reservation.checkOut);
+
+    if (checkIn > now) {
+      return 'UPCOMING';
+    }
+
+    if (checkIn <= now && checkOut > now) {
+      return 'ACTIVE';
+    }
+
+    return 'PAST';
+  }
+
+  private serializeReservation(reservation: any) {
+    const plainReservation =
+      typeof reservation.get === 'function'
+        ? reservation.get({ plain: true })
+        : reservation;
+
+    return {
+      ...plainReservation,
+
+      /**
+       * The frontend receives this:
+       * UPCOMING | ACTIVE | CANCELLED | PAST
+       */
+      status: this.getPublicStatus(plainReservation),
+
+      /**
+       * Optional: useful for debugging.
+       * The database value is usually:
+       * CONFIRMED | CANCELLED
+       */
+      internalStatus: plainReservation.status,
+    };
+  }
+
   async createReservation(dto: CreateReservationDto) {
     const checkIn = new Date(dto.checkIn);
     const checkOut = new Date(dto.checkOut);
+
+    if (Number.isNaN(checkIn.getTime()) || Number.isNaN(checkOut.getTime())) {
+      throw new BadRequestException('Invalid checkIn or checkOut date');
+    }
 
     if (checkIn >= checkOut) {
       throw new BadRequestException('checkOut must be after checkIn');
@@ -65,7 +116,12 @@ export class ReservationsService {
       const overlappingReservation = await this.reservationModel.findOne({
         where: {
           roomId: dto.roomId,
+
+          /**
+           * Internally, only confirmed reservations block room availability.
+           */
           status: 'CONFIRMED',
+
           checkIn: {
             [Op.lt]: checkOut,
           },
@@ -84,18 +140,26 @@ export class ReservationsService {
 
       const totalPrice = Number(room.price) * nights;
 
-      return this.reservationModel.create(
+      const reservation = await this.reservationModel.create(
         {
           roomId: dto.roomId,
           userId: dto.userId,
           checkIn,
           checkOut,
           totalPrice,
+
+          /**
+           * Database value.
+           * The frontend will receive UPCOMING or ACTIVE depending on dates.
+           */
           status: 'CONFIRMED',
+
           numberOfGuest: dto.numberOfGuest,
         },
         { transaction },
       );
+
+      return this.serializeReservation(reservation);
     });
   }
 
@@ -107,16 +171,20 @@ export class ReservationsService {
     const where: WhereOptions = {};
 
     if (query.roomId) {
-      where['roomId'] = query.roomId;
+      where['roomId'] = Number(query.roomId);
     }
 
     if (query.userId) {
-      where['userId'] = query.userId;
+      where['userId'] = Number(query.userId);
     }
 
     if (query.from && query.to) {
       const from = new Date(query.from);
       const to = new Date(query.to);
+
+      if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+        throw new BadRequestException('Invalid from or to date');
+      }
 
       if (from >= to) {
         throw new BadRequestException('to must be after from');
@@ -133,19 +201,30 @@ export class ReservationsService {
     }
 
     const now = new Date();
+    const requestedStatus = query.status?.toUpperCase();
 
-    if (query.status === 'cancelled') {
+    /**
+     * The frontend can send:
+     * ?status=CANCELLED
+     * ?status=UPCOMING
+     * ?status=ACTIVE
+     * ?status=PAST
+     *
+     * But the database stores:
+     * CONFIRMED | CANCELLED
+     */
+    if (requestedStatus === 'CANCELLED') {
       where['status'] = 'CANCELLED';
     }
 
-    if (query.status === 'upcoming') {
+    if (requestedStatus === 'UPCOMING') {
       where['status'] = 'CONFIRMED';
       where['checkIn'] = {
         [Op.gt]: now,
       };
     }
 
-    if (query.status === 'active') {
+    if (requestedStatus === 'ACTIVE') {
       where['status'] = 'CONFIRMED';
       where['checkIn'] = {
         [Op.lte]: now,
@@ -155,7 +234,7 @@ export class ReservationsService {
       };
     }
 
-    if (query.status === 'past') {
+    if (requestedStatus === 'PAST') {
       where['status'] = 'CONFIRMED';
       where['checkOut'] = {
         [Op.lte]: now,
@@ -178,8 +257,12 @@ export class ReservationsService {
       offset,
     });
 
+    const data = rows.map((reservation) =>
+      this.serializeReservation(reservation),
+    );
+
     return {
-      data: rows,
+      data,
       meta: {
         total: count,
         page,
@@ -206,7 +289,7 @@ export class ReservationsService {
       throw new NotFoundException('Reservation not found');
     }
 
-    return reservation;
+    return this.serializeReservation(reservation);
   }
 
   async cancelReservation(id: number) {
@@ -216,6 +299,9 @@ export class ReservationsService {
       throw new NotFoundException('Reservation not found');
     }
 
+    /**
+     * Use internal DB status here.
+     */
     if (reservation.status === 'CANCELLED') {
       throw new BadRequestException('Reservation is already cancelled');
     }
@@ -232,13 +318,15 @@ export class ReservationsService {
       );
     }
 
-    reservation.status = 'CANCELLED';
+    await reservation.update({
+      status: 'CANCELLED',
+    });
 
-    await reservation.save();
+    const updatedReservation = await this.findOne(id);
 
     return {
       message: 'Reservation cancelled successfully',
-      reservation,
+      reservation: updatedReservation,
     };
   }
 
@@ -248,18 +336,26 @@ export class ReservationsService {
     if (!reservation) {
       throw new NotFoundException('Reservation not found');
     }
-
-    if (reservation.status === 'CANCELLED') {
+    console.log('RESERVATIIIIION', reservation);
+    if (reservation.dataValues?.status === 'CANCELLED') {
       throw new BadRequestException('Cannot edit a cancelled reservation');
     }
 
     const checkIn = dto.checkIn
       ? new Date(dto.checkIn)
-      : new Date(reservation.checkIn);
+      : new Date(reservation?.dataValues.checkIn);
+
     const checkOut = dto.checkOut
       ? new Date(dto.checkOut)
-      : new Date(reservation.checkOut);
-    const numberOfGuest = dto.numberOfGuest ?? reservation.numberOfGuest;
+      : new Date(reservation?.dataValues.checkOut);
+
+    const numberOfGuest = Number(
+      dto.numberOfGuest ?? reservation.numberOfGuest,
+    );
+
+    if (Number.isNaN(checkIn.getTime()) || Number.isNaN(checkOut.getTime())) {
+      throw new BadRequestException('Invalid checkIn or checkOut date');
+    }
 
     if (checkIn >= checkOut) {
       throw new BadRequestException('checkOut must be after checkIn');
@@ -277,17 +373,19 @@ export class ReservationsService {
       throw new BadRequestException('Reservation must be at least 1 night');
     }
 
-    return this.sequelize.transaction(async (transaction) => {
+    await this.sequelize.transaction(async (transaction) => {
       await this.sequelize.query('SELECT pg_advisory_xact_lock(:roomId)', {
-        replacements: { roomId: reservation?.dataValues?.roomId },
+        replacements: {
+          roomId: reservation?.dataValues.roomId,
+        },
         transaction,
       });
 
-      const room = await this.roomModel.findByPk(reservation?.dataValues?.roomId, {
+      const room = await this.roomModel.findByPk(reservation?.dataValues.roomId, {
         transaction,
       });
 
-      if (!room || !room.isActive) {
+      if (!room || !room.dataValues.isActive) {
         throw new NotFoundException('Room not found or inactive');
       }
 
@@ -325,8 +423,8 @@ export class ReservationsService {
         },
         { transaction },
       );
-
-      return this.findOne(id);
     });
+
+    return this.findOne(id);
   }
 }
