@@ -4,18 +4,23 @@ export class CreateReservationDto {
   @IsNotEmpty()
   @IsInt()
   @Min(1)
-  roomId!: number;
+  declare roomId: number;
 
   @IsNotEmpty()
   @IsInt()
   @Min(1)
-  userId!: number;
+  declare userId: number;
 
   @IsNotEmpty()
   @IsDateString()
-  checkIn!: string;
+  declare checkIn: string;
 
   @IsNotEmpty()
   @IsDateString()
-  checkOut!: string;
+  declare checkOut: string;
+
+  @IsNotEmpty()
+  @IsInt()
+  @Min(1)
+  declare numberOfGuest: number;
 }
