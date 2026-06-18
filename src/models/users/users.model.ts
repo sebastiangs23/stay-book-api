@@ -7,27 +7,27 @@ export class User extends Model {
     type: DataType.STRING(30),
     allowNull: false,
   })
-  name: string;
+  declare name: string;
 
   @Column({
     type: DataType.STRING(40),
     unique: true,
     allowNull: false,
   })
-  email: string;
+  declare email: string;
 
   @Column({
     type: DataType.STRING,
     allowNull: false,
   })
-  passwordHash: string;
+  declare passwordHash: string;
 
   @Column({
     type: DataType.ENUM('GUEST', 'STAFF'),
     allowNull: false,
   })
-  role: 'GUEST' | 'STAFF';
+  declare role: 'GUEST' | 'STAFF';
 
   @HasMany(() => Reservation)
-  reservations: Reservation[];
+  declare reservations: Reservation[];
 }

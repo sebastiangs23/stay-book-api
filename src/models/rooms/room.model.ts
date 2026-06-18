@@ -7,19 +7,19 @@ export class Room extends Model {
     type: DataType.STRING,
     allowNull: false,
   })
-  name!: string;
+  declare name: string;
 
   @Column({
     type: DataType.TEXT,
     allowNull: false,
   })
-  description!: string;
+  declare description: string;
 
   @Column({
     type: DataType.DECIMAL(10, 2),
     allowNull: false,
   })
-  price!: number;
+  declare price: number;
 
   @Column({
     type: DataType.BOOLEAN,
@@ -31,15 +31,14 @@ export class Room extends Model {
     type: DataType.INTEGER,
     allowNull: false,
   })
-  floor!: number;
+  declare floor: number;
 
-  // simple approach (array of URLs)
   @Column({
     type: DataType.ARRAY(DataType.STRING),
     allowNull: true,
   })
-  photos!: string[];
+  declare photos: string[];
 
   @HasMany(() => Reservation)
-  reservations!: Reservation[];
+  declare reservations: Reservation[];
 }
