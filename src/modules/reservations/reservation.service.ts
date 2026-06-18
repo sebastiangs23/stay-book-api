@@ -72,6 +72,7 @@ export class ReservationsService {
           checkOut: {
             [Op.gt]: checkIn,
           },
+          numberOfGuest: dto.numberOfGuest,
         },
         transaction,
       });
@@ -92,6 +93,7 @@ export class ReservationsService {
           checkOut,
           totalPrice,
           status: 'CONFIRMED',
+          numberOfGuest: dto.numberOfGuest,
         },
         { transaction },
       );
@@ -169,7 +171,7 @@ export class ReservationsService {
         },
         {
           model: User,
-          attributes: ['id', 'name', 'email', 'role'],
+          attributes: ['id', 'name', 'email', 'role', 'numberOfGuest'],
         },
       ],
       order: [['checkIn', 'ASC']],
@@ -196,7 +198,7 @@ export class ReservationsService {
         },
         {
           model: User,
-          attributes: ['id', 'name', 'email', 'role'],
+          attributes: ['id', 'name', 'email', 'role', 'numberOfGuest'],
         },
       ],
     });

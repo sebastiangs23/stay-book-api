@@ -5,6 +5,7 @@ import {
   DataType,
   ForeignKey,
   BelongsTo,
+  AllowNull,
 } from 'sequelize-typescript';
 import { User } from '../users/users.model';
 import { Room } from '../rooms/room.model';
@@ -71,4 +72,10 @@ export class Reservation extends Model {
     defaultValue: 'CONFIRMED',
   })
   status!: 'CONFIRMED' | 'CANCELLED';
+
+  @Column({
+    type: DataType.INTEGER,
+    allowNull: false,
+  })
+  numberOfGuest!: number;
 }
