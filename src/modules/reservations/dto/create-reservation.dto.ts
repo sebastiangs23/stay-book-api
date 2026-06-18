@@ -1,26 +1,31 @@
-import { IsDateString, IsInt, IsNotEmpty, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsDateString, IsInt, IsNotEmpty, Max, Min } from 'class-validator';
 
 export class CreateReservationDto {
   @IsNotEmpty()
+  @Type(() => Number)
   @IsInt()
   @Min(1)
-  declare roomId: number;
+  roomId!: number;
 
   @IsNotEmpty()
+  @Type(() => Number)
   @IsInt()
   @Min(1)
-  declare userId: number;
+  userId!: number;
 
   @IsNotEmpty()
   @IsDateString()
-  declare checkIn: string;
+  checkIn!: string;
 
   @IsNotEmpty()
   @IsDateString()
-  declare checkOut: string;
+  checkOut!: string;
 
   @IsNotEmpty()
+  @Type(() => Number)
   @IsInt()
   @Min(1)
-  declare numberOfGuest: number;
+  @Max(15)
+  numberOfGuest!: number;
 }
