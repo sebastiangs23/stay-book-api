@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
+import { UnauthorizedException } from '@nestjs/common';
 import { Op, WhereOptions } from 'sequelize';
 import { User } from '../../models/users/users.model';
 import * as bcrypt from 'bcrypt';
@@ -11,6 +12,7 @@ import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ListUsersQueryDto } from './dto/list-users-query.dto';
+import { SignInDto } from './dto/sign-in.dto';
 
 @Injectable()
 export class UsersService {
@@ -117,6 +119,32 @@ export class UsersService {
         email,
       },
     });
+  }
+
+  async findByEmailWithPassword(email: string) {
+    console.log('email', email)
+    return this.userModel.findOne({
+      where: { email },
+    });
+  }
+
+  async signIn(dto: SignInDto) {
+    const user = await this.findByEmailWithPassword(dto.email);
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+    // console.log()
+    const isPasswordValid = await bcrypt.compare(
+      dto.password,
+      user.passwordHash,
+    );
+
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    return this.sanitizeUser(user);
   }
 
   async update(id: number, dto: UpdateUserDto) {

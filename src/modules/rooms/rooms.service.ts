@@ -13,6 +13,14 @@ import { CreateRoomDto } from './dto/create-rooms.dto';
 import { UpdateRoomDto } from './dto/update-rooms.dto';
 import { ListRoomsQueryDto } from './dto/list-rooms-query.dto';
 
+import { S3Service } from '../aws/aws.service';
+
+type UploadedFile = {
+  originalname: string;
+  buffer: Buffer;
+  mimetype: string;
+};
+
 @Injectable()
 export class RoomsService {
   constructor(
@@ -21,17 +29,47 @@ export class RoomsService {
 
     @InjectModel(Reservation)
     private readonly reservationModel: typeof Reservation,
+
+    private readonly s3Service: S3Service,
   ) {}
 
-  async create(dto: CreateRoomDto) {
-    return this.roomModel.create({
-      name: dto.name,
-      description: dto.description,
-      price: dto.price,
-      floor: dto.floor,
-      isActive: dto.isActive ?? true,
-      photos: dto.photos ?? [],
-    });
+  private parseBoolean(value: unknown): boolean | undefined {
+    if (value === undefined || value === null || value === '') {
+      return undefined;
+    }
+
+    if (typeof value === 'boolean') {
+      return value;
+    }
+
+    if (typeof value === 'string') {
+      return value === 'true';
+    }
+
+    return Boolean(value);
+  }
+
+  async create(dto: CreateRoomDto, files: UploadedFile[] = []) {
+    try {
+      const photoUrls = files.length
+        ? await this.s3Service.uploadFiles(files, 'rooms')
+        : [];
+
+      return this.roomModel.create({
+        name: dto.name,
+        description: dto.description,
+        price: Number(dto.price),
+        floor: Number(dto.floor),
+        isActive: this.parseBoolean(dto.isActive) ?? true,
+        photos: photoUrls,
+      });
+    } catch (error) {
+      return {
+        status: 401,
+        message: 'Something went wrong trying to create the room',
+        error: error,
+      };
+    }
   }
 
   async findAll(query: ListRoomsQueryDto) {
@@ -60,14 +98,6 @@ export class RoomsService {
       where.isActive = query.isActive;
     }
 
-    /**
-     * Availability filter:
-     * A room is unavailable when there is a confirmed reservation overlapping:
-     * existing.checkIn < requestedCheckOut
-     * AND existing.checkOut > requestedCheckIn
-     *
-     * checkout same day as next checkin is allowed.
-     */
     if (query.checkIn && query.checkOut) {
       const checkIn = new Date(query.checkIn);
       const checkOut = new Date(query.checkOut);
@@ -130,40 +160,91 @@ export class RoomsService {
     return room;
   }
 
-  async update(id: number, dto: UpdateRoomDto) {
-    const room = await this.roomModel.findByPk(id);
+  async update(id: number, dto: UpdateRoomDto, files: UploadedFile[] = []) {
+    try {
+      console.log('DTOOOO',  dto)
+      const room = await this.roomModel.findByPk(id);
+      console.log('THE ROOM WAS FOUND', room);
 
-    if (!room) {
-      throw new NotFoundException('Room not found');
+      if (!room) {
+        throw new NotFoundException('Room not found');
+      }
+
+      const previousPhotos = room.photos || [];
+
+      /**
+       * Editing image logic:
+       *
+       * dto.photos should contain the existing photo URLs that the user wants to keep.
+       *
+       * Example:
+       * Existing photos in DB:
+       * ["url1", "url2", "url3"]
+       *
+       * Frontend sends:
+       * photos: ["url1", "url3"]
+       *
+       * Then "url2" is deleted from S3 and removed from DB.
+       */
+      let finalPhotos = previousPhotos;
+
+      if (dto.photosToKeep !== undefined) {
+        finalPhotos = Array.isArray(dto.photosToKeep) ? dto.photosToKeep : [];
+
+        const photosToDelete = previousPhotos.filter(
+          (photoUrl) => !finalPhotos.includes(photoUrl),
+        );
+
+        if (photosToDelete.length > 0) {
+          await this.s3Service.deleteFilesByUrls(photosToDelete);
+        }
+      }
+
+      /**
+       * If new files are uploaded while editing,
+       * upload them to S3 and add them to the final photos array.
+       */
+      if (files.length > 0) {
+        console.log('I want to check if its entering here')
+        const newPhotoUrls = await this.s3Service.uploadFiles(
+          files,
+          `rooms/${id}`,
+        );
+        finalPhotos = [...finalPhotos, ...newPhotoUrls];
+      }
+
+      if (dto.name !== undefined) {
+        room.name = dto.name;
+        console.log('it supposed to change')
+      }
+
+      if (dto.description !== undefined) {
+        room.description = dto.description;
+      }
+
+      if (dto.price !== undefined) {
+        room.price = Number(dto.price);
+      }
+
+      if (dto.floor !== undefined) {
+        room.floor = Number(dto.floor);
+      }
+
+      const parsedIsActive = this.parseBoolean(dto.isActive);
+
+      if (parsedIsActive !== undefined) {
+        room.isActive = parsedIsActive;
+      }
+
+      room.photos = finalPhotos;
+
+      const response = await room.save();
+      console.log('is getting updeted',  response)
+
+      return room;
+    } catch (error) {
+      console.log('MISTAKE HERE: ', error);
     }
-
-    if (dto.name !== undefined) {
-      room.name = dto.name;
-    }
-
-    if (dto.description !== undefined) {
-      room.description = dto.description;
-    }
-
-    if (dto.price !== undefined) {
-      room.price = dto.price;
-    }
-
-    if (dto.floor !== undefined) {
-      room.floor = dto.floor;
-    }
-
-    if (dto.isActive !== undefined) {
-      room.isActive = dto.isActive;
-    }
-
-    if (dto.photos !== undefined) {
-      room.photos = dto.photos;
-    }
-
-    await room.save();
-
-    return room;
   }
 
   async deactivate(id: number) {
@@ -187,6 +268,12 @@ export class RoomsService {
 
     if (!room) {
       throw new NotFoundException('Room not found');
+    }
+
+    const photos = room.photos || [];
+
+    if (photos.length > 0) {
+      await this.s3Service.deleteFilesByUrls(photos);
     }
 
     await room.destroy();

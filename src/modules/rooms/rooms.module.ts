@@ -4,13 +4,14 @@ import { SequelizeModule } from '@nestjs/sequelize';
 import { Room } from '../../models/rooms/room.model';
 import { Reservation } from '../../models/reservations/reservation.model';
 
-import { RoomsController } from './rooms.controller';
 import { RoomsService } from './rooms.service';
+import { RoomsController } from './rooms.controller';
+
+import { AwsModule } from '../aws/aws.module';
 
 @Module({
-  imports: [SequelizeModule.forFeature([Room, Reservation])],
+  imports: [SequelizeModule.forFeature([Room, Reservation]), AwsModule],
   controllers: [RoomsController],
   providers: [RoomsService],
-  exports: [RoomsService],
 })
 export class RoomsModule {}
