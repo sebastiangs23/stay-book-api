@@ -79,33 +79,56 @@ export class RoomsService {
 
     const where: any = {};
 
-    if (query.search) {
+    if (query.search?.trim()) {
       where[Op.or] = [
         {
           name: {
-            [Op.iLike]: `%${query.search}%`,
+            [Op.iLike]: `%${query.search.trim()}%`,
           },
         },
         {
           description: {
-            [Op.iLike]: `%${query.search}%`,
+            [Op.iLike]: `%${query.search.trim()}%`,
           },
         },
       ];
     }
 
-    if (query.isActive !== undefined) {
-      where.isActive = query.isActive;
+    /**
+     * Query params arrive as strings from the frontend:
+     * /rooms?isActive=true
+     *
+     * So query.isActive can be "true", not true.
+     */
+    const parsedIsActive = this.parseBoolean(query.isActive);
+
+    if (parsedIsActive !== undefined) {
+      where.isActive = parsedIsActive;
     }
 
     if (query.checkIn && query.checkOut) {
       const checkIn = new Date(query.checkIn);
       const checkOut = new Date(query.checkOut);
 
+      if (Number.isNaN(checkIn.getTime()) || Number.isNaN(checkOut.getTime())) {
+        throw new BadRequestException('Invalid checkIn or checkOut date');
+      }
+
       if (checkIn >= checkOut) {
         throw new BadRequestException('checkOut must be after checkIn');
       }
 
+      /**
+       * Find reservations that overlap with the requested date range.
+       *
+       * Existing reservation overlaps when:
+       * existing.checkIn < requestedCheckOut
+       * AND
+       * existing.checkOut > requestedCheckIn
+       *
+       * This allows:
+       * existing checkout = selected check-in
+       */
       const unavailableReservations = await this.reservationModel.findAll({
         where: {
           status: 'CONFIRMED',
@@ -117,20 +140,38 @@ export class RoomsService {
           },
         },
         attributes: ['roomId'],
+        raw: true,
       });
 
-      const unavailableRoomIds = unavailableReservations.map(
-        (reservation) => reservation.roomId,
-      );
+      const unavailableRoomIds = [
+        ...new Set(
+          unavailableReservations
+            .map((reservation: any) => Number(reservation.roomId))
+            .filter((roomId) => Number.isInteger(roomId) && roomId > 0),
+        ),
+      ];
 
+      console.log('checkIn:', checkIn);
+      console.log('checkOut:', checkOut);
+      console.log('unavailableRoomIds:', unavailableRoomIds);
+
+      /**
+       * Very important:
+       * Only apply NOT IN if we actually have valid room IDs.
+       */
       if (unavailableRoomIds.length > 0) {
         where.id = {
           [Op.notIn]: unavailableRoomIds,
         };
       }
 
+      /**
+       * When checking availability, guests should only see active rooms.
+       */
       where.isActive = true;
     }
+
+    console.log('rooms where:', where);
 
     const { rows, count } = await this.roomModel.findAndCountAll({
       where,
@@ -162,7 +203,7 @@ export class RoomsService {
 
   async update(id: number, dto: UpdateRoomDto, files: UploadedFile[] = []) {
     try {
-      console.log('DTOOOO',  dto)
+      console.log('DTOOOO', dto);
       const room = await this.roomModel.findByPk(id);
       console.log('THE ROOM WAS FOUND', room);
 
@@ -205,7 +246,7 @@ export class RoomsService {
        * upload them to S3 and add them to the final photos array.
        */
       if (files.length > 0) {
-        console.log('I want to check if its entering here')
+        console.log('I want to check if its entering here');
         const newPhotoUrls = await this.s3Service.uploadFiles(
           files,
           `rooms/${id}`,
@@ -215,7 +256,7 @@ export class RoomsService {
 
       if (dto.name !== undefined) {
         room.name = dto.name;
-        console.log('it supposed to change')
+        console.log('it supposed to change');
       }
 
       if (dto.description !== undefined) {
@@ -239,7 +280,7 @@ export class RoomsService {
       room.photos = finalPhotos;
 
       const response = await room.save();
-      console.log('is getting updeted',  response)
+      console.log('is getting updeted', response);
 
       return room;
     } catch (error) {

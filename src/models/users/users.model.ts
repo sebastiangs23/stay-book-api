@@ -28,6 +28,12 @@ export class User extends Model {
   })
   declare role: 'GUEST' | 'STAFF';
 
+  @Column({
+    type: DataType.BOOLEAN,
+    allowNull: false,
+  })
+  declare isActive: boolean;
+
   @HasMany(() => Reservation)
   declare reservations: Reservation[];
 }
