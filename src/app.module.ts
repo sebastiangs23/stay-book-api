@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { SequelizeModule } from '@nestjs/sequelize';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 import { databaseConfig } from './config/database.config';
 
@@ -12,6 +12,7 @@ import { ReservationsModule } from './modules/reservations/reservation.module';
 import { UsersModule } from './modules/users/users.module';
 import { RoomsModule } from './modules/rooms/rooms.module';
 import { SubmoduleModule } from './modules/submodule/submodule.module';
+import { APP_GUARD } from '@nestjs/core';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -40,6 +41,12 @@ import { SubmoduleModule } from './modules/submodule/submodule.module';
     UsersModule,
     RoomsModule,
     SubmoduleModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
 })
 export class AppModule {}

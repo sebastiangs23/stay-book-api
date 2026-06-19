@@ -8,6 +8,7 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 
 import { UsersService } from './users.service';
@@ -15,6 +16,11 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ListUsersQueryDto } from './dto/list-users-query.dto';
 import { SignInDto } from './dto/sign-in.dto';
+
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { RolesGuard } from 'src/common/guards/roles.guard';
+
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
@@ -30,6 +36,7 @@ export class UsersController {
   }
 
   @Get()
+  @UseGuards(JwtAuthGuard)
   findAll(@Query() query: ListUsersQueryDto) {
     return this.usersService.findAll(query);
   }
@@ -40,11 +47,15 @@ export class UsersController {
   }
 
   @Patch(':id')
+  @Roles('STAFF')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateUserDto) {
     return this.usersService.update(id, dto);
   }
 
   @Delete(':id')
+  @Roles('STAFF')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.usersService.remove(id);
   }

@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsEmail,
   IsIn,
   IsOptional,
@@ -23,4 +24,9 @@ export class UpdateUserDto {
   @IsOptional()
   @IsIn(['GUEST', 'STAFF'])
   role?: 'GUEST' | 'STAFF';
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
 }

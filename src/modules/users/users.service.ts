@@ -2,12 +2,14 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
-import { UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { Op, WhereOptions } from 'sequelize';
-import { User } from '../../models/users/users.model';
 import * as bcrypt from 'bcrypt';
+
+import { User } from '../../models/users/users.model';
 
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -19,6 +21,8 @@ export class UsersService {
   constructor(
     @InjectModel(User)
     private readonly userModel: typeof User,
+
+    private readonly jwtService: JwtService,
   ) {}
 
   private sanitizeUser(user: User) {
@@ -27,6 +31,16 @@ export class UsersService {
     delete plainUser.passwordHash;
 
     return plainUser;
+  }
+
+  private generateAccessToken(user: User) {
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+    };
+
+    return this.jwtService.sign(payload);
   }
 
   async create(dto: CreateUserDto) {
@@ -124,7 +138,9 @@ export class UsersService {
 
   async findByEmailWithPassword(email: string) {
     return this.userModel.findOne({
-      where: { email },
+      where: {
+        email,
+      },
     });
   }
 
@@ -144,7 +160,17 @@ export class UsersService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    return this.sanitizeUser(user);
+    if (user.isActive === false) {
+      throw new UnauthorizedException('User account is inactive');
+    }
+
+    const sanitizedUser = this.sanitizeUser(user);
+    const accessToken = this.generateAccessToken(user);
+
+    return {
+      user: sanitizedUser,
+      accessToken,
+    };
   }
 
   async update(id: number, dto: UpdateUserDto) {
@@ -176,6 +202,10 @@ export class UsersService {
 
     if (dto.role !== undefined) {
       user.role = dto.role;
+    }
+
+    if (dto.isActive !== undefined) {
+      user.isActive = dto.isActive;
     }
 
     if (dto.password !== undefined) {
