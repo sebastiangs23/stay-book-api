@@ -39,6 +39,13 @@ export class Room extends Model {
   })
   declare photos: string[];
 
+  @Column({
+    type: DataType.ARRAY(DataType.STRING),
+    allowNull: false,
+    defaultValue: [],
+  })
+  declare amenities: string[];
+
   @HasMany(() => Reservation)
   declare reservations: Reservation[];
 }

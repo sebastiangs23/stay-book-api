@@ -62,6 +62,7 @@ export class RoomsService {
         floor: Number(dto.floor),
         isActive: this.parseBoolean(dto.isActive) ?? true,
         photos: photoUrls,
+        amenities: dto.amenities ?? [],
       });
     } catch (error) {
       return {
@@ -203,9 +204,7 @@ export class RoomsService {
 
   async update(id: number, dto: UpdateRoomDto, files: UploadedFile[] = []) {
     try {
-      console.log('DTOOOO', dto);
       const room = await this.roomModel.findByPk(id);
-      console.log('THE ROOM WAS FOUND', room);
 
       if (!room) {
         throw new NotFoundException('Room not found');
@@ -213,20 +212,6 @@ export class RoomsService {
 
       const previousPhotos = room.photos || [];
 
-      /**
-       * Editing image logic:
-       *
-       * dto.photos should contain the existing photo URLs that the user wants to keep.
-       *
-       * Example:
-       * Existing photos in DB:
-       * ["url1", "url2", "url3"]
-       *
-       * Frontend sends:
-       * photos: ["url1", "url3"]
-       *
-       * Then "url2" is deleted from S3 and removed from DB.
-       */
       let finalPhotos = previousPhotos;
 
       if (dto.photosToKeep !== undefined) {
@@ -241,10 +226,6 @@ export class RoomsService {
         }
       }
 
-      /**
-       * If new files are uploaded while editing,
-       * upload them to S3 and add them to the final photos array.
-       */
       if (files.length > 0) {
         console.log('I want to check if its entering here');
         const newPhotoUrls = await this.s3Service.uploadFiles(
@@ -275,6 +256,10 @@ export class RoomsService {
 
       if (parsedIsActive !== undefined) {
         room.isActive = parsedIsActive;
+      }
+
+      if (dto.amenities !== undefined) {
+        room.amenities = dto.amenities;
       }
 
       room.photos = finalPhotos;
