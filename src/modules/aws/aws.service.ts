@@ -5,12 +5,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { randomUUID } from 'crypto';
-
-export type UploadedFile = {
-  originalname: string;
-  buffer: Buffer;
-  mimetype: string;
-};
+import { UploadedFile } from 'src/types/types';
 
 @Injectable()
 export class S3Service {
@@ -87,16 +82,6 @@ export class S3Service {
     try {
       const url = new URL(fileUrl);
 
-      /**
-       * Example URL:
-       * https://my-bucket.s3.us-east-1.amazonaws.com/rooms/abc.png
-       *
-       * pathname:
-       * /rooms/abc.png
-       *
-       * key:
-       * rooms/abc.png
-       */
       return decodeURIComponent(url.pathname.substring(1));
     } catch (error) {
       console.error('Invalid S3 URL:', fileUrl);

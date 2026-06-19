@@ -1,7 +1,19 @@
 import { Table, Column, Model, DataType, HasMany } from 'sequelize-typescript';
 import { Reservation } from '../reservations/reservation.model';
 
-@Table({ tableName: 'rooms' })
+@Table({
+  tableName: 'rooms',
+  indexes: [
+    {
+      name: 'idx_room_name',
+      fields: ['name'],
+    },
+    {
+      name: 'idx_room_desc',
+      fields: ['description'],
+    },
+  ],
+})
 export class Room extends Model {
   @Column({
     type: DataType.STRING,

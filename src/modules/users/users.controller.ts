@@ -21,6 +21,17 @@ import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 
+import {
+  ApiBearerAuth,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
+
+@ApiTags('Users')
+@ApiBearerAuth('access-token')
+@ApiUnauthorizedResponse({
+  description: 'Unauthorized. Bearer token is missing or invalid.',
+})
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
