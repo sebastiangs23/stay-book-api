@@ -18,7 +18,8 @@ import { RoomsService } from './rooms.service';
 import { CreateRoomDto } from './dto/create-rooms.dto';
 import { UpdateRoomDto } from './dto/update-rooms.dto';
 import { ListRoomsQueryDto } from './dto/list-rooms-query.dto';
-import { UploadedFile } from '../aws/aws.service';
+import { UploadedFile } from '../../types/types';
+
 
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';

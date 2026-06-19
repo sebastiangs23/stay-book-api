@@ -16,7 +16,7 @@ import { CreateReservationDto } from './dto/create-reservation.dto';
 import { ListReservationsQueryDto } from './dto/list-reservations-query.dto';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
 
-type PublicReservationStatus = 'UPCOMING' | 'ACTIVE' | 'CANCELLED' | 'PAST';
+import { PublicReservationStatus } from 'src/types/types';
 
 @Injectable()
 export class ReservationsService {
@@ -61,18 +61,7 @@ export class ReservationsService {
 
     return {
       ...plainReservation,
-
-      /**
-       * The frontend receives this:
-       * UPCOMING | ACTIVE | CANCELLED | PAST
-       */
       status: this.getPublicStatus(plainReservation),
-
-      /**
-       * Optional: useful for debugging.
-       * The database value is usually:
-       * CONFIRMED | CANCELLED
-       */
       internalStatus: plainReservation.status,
     };
   }
@@ -116,10 +105,6 @@ export class ReservationsService {
       const overlappingReservation = await this.reservationModel.findOne({
         where: {
           roomId: dto.roomId,
-
-          /**
-           * Internally, only confirmed reservations block room availability.
-           */
           status: 'CONFIRMED',
 
           checkIn: {
@@ -147,13 +132,7 @@ export class ReservationsService {
           checkIn,
           checkOut,
           totalPrice,
-
-          /**
-           * Database value.
-           * The frontend will receive UPCOMING or ACTIVE depending on dates.
-           */
           status: 'CONFIRMED',
-
           numberOfGuest: dto.numberOfGuest,
         },
         { transaction },
@@ -203,16 +182,6 @@ export class ReservationsService {
     const now = new Date();
     const requestedStatus = query.status?.toUpperCase();
 
-    /**
-     * The frontend can send:
-     * ?status=CANCELLED
-     * ?status=UPCOMING
-     * ?status=ACTIVE
-     * ?status=PAST
-     *
-     * But the database stores:
-     * CONFIRMED | CANCELLED
-     */
     if (requestedStatus === 'CANCELLED') {
       where['status'] = 'CANCELLED';
     }
@@ -381,9 +350,12 @@ export class ReservationsService {
         transaction,
       });
 
-      const room = await this.roomModel.findByPk(reservation?.dataValues.roomId, {
-        transaction,
-      });
+      const room = await this.roomModel.findByPk(
+        reservation?.dataValues.roomId,
+        {
+          transaction,
+        },
+      );
 
       if (!room || !room.dataValues.isActive) {
         throw new NotFoundException('Room not found or inactive');

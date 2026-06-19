@@ -15,11 +15,7 @@ import { ListRoomsQueryDto } from './dto/list-rooms-query.dto';
 
 import { S3Service } from '../aws/aws.service';
 
-type UploadedFile = {
-  originalname: string;
-  buffer: Buffer;
-  mimetype: string;
-};
+import { UploadedFile } from 'src/types/types';
 
 @Injectable()
 export class RoomsService {
@@ -95,12 +91,6 @@ export class RoomsService {
       ];
     }
 
-    /**
-     * Query params arrive as strings from the frontend:
-     * /rooms?isActive=true
-     *
-     * So query.isActive can be "true", not true.
-     */
     const parsedIsActive = this.parseBoolean(query.isActive);
 
     if (parsedIsActive !== undefined) {

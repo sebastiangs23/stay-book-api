@@ -4,10 +4,12 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 import { securityMiddleware } from './common/middlewares/security.middleware';
+import { setupSwagger } from './config/swagger.config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  setupSwagger(app);
   app.use(securityMiddleware);
 
   app.enableCors({
