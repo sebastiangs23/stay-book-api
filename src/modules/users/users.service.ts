@@ -175,12 +175,13 @@ export class UsersService {
 
   async update(id: number, dto: UpdateUserDto) {
     const user = await this.userModel.findByPk(id);
-
+    console.log('user', user);
+    
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    if (dto.email && dto.email !== user.email) {
+    if (dto.email && dto.email !== user?.dataValues.email) {
       const existingUser = await this.userModel.findOne({
         where: {
           email: dto.email,
@@ -191,7 +192,7 @@ export class UsersService {
         throw new BadRequestException('Email is already registered');
       }
     }
-
+    console.log('dto.name', dto.name)
     if (dto.name !== undefined) {
       user.name = dto.name;
     }
