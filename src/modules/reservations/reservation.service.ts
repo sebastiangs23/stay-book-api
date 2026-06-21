@@ -305,7 +305,7 @@ export class ReservationsService {
     if (!reservation) {
       throw new NotFoundException('Reservation not found');
     }
-    console.log('RESERVATIIIIION', reservation);
+
     if (reservation.dataValues?.status === 'CANCELLED') {
       throw new BadRequestException('Cannot edit a cancelled reservation');
     }
